@@ -37,7 +37,7 @@ jobs:
 
       - name: Clean kernel source tree
         run: |
-          make -C kernel-source mrproper && make ARCH=arm64 mrproper
+          make -C kernel-source ARCH=arm64 distclean
 
       - name: Build kernel
         run: |
