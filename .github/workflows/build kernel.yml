@@ -1,4 +1,4 @@
-name: AENA's Kernel Build
+name: AENA's
 
 on:
   workflow_dispatch:
@@ -7,63 +7,58 @@ jobs:
   build-kernel:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout Repository
+        uses: actions/checkout@v3
 
-      - name: Setup environment
+      - name: Setup Environment Variables
         run: |
-          # Load AnyKernel3 repo URL & branch
-          echo "ANYKERNEL_SOURCE=$(grep -w ANYKERNEL_SOURCE config.env | cut -d '=' -f2)" >> $GITHUB_ENV
-          echo "ANYKERNEL_SOURCE_BRANCH=$(grep -w ANYKERNEL_SOURCE_BRANCH config.env | cut -d '=' -f2)" >> $GITHUB_ENV
+          echo "KERNEL_SOURCE=https://github.com/IamCodebreaker/android_kernel_samsung_exynos5420.git" >> $GITHUB_ENV
+          echo "KERNEL_SOURCE_BRANCH=lineage-17.1" >> $GITHUB_ENV
+          echo "KERNEL_TARGET=lineageos_ha3g" >> $GITHUB_ENV
+          echo "ANYKERNEL_SOURCE=https://github.com/osm0sis/AnyKernel3.git" >> $GITHUB_ENV
+          echo "ANYKERNEL_SOURCE_BRANCH=master" >> $GITHUB_ENV
 
-          # Existing kernel environment
-          echo "KERNEL_SOURCE=$(grep -w KERNEL_SOURCE config.env | cut -d '=' -f2)" >> $GITHUB_ENV
-          echo "KERNEL_SOURCE_BRANCH=$(grep -w KERNEL_SOURCE_BRANCH config.env | cut -d '=' -f2)" >> $GITHUB_ENV
-          echo "KERNEL_TARGET=$(grep -w KERNEL_TARGET config.env | cut -d '=' -f2)" >> $GITHUB_ENV
-          echo "BUILD_ARGS=$(grep -w BUILD_ARGS config.env | cut -d ':' -f2)" >> $GITHUB_ENV
-
-      - name: Pull toolchain
+      - name: Clone GCC 4.8 Toolchain
         run: |
-          git clone --depth=1 https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_arm_arm-linux-androideabi-4.9 arm-linux-androideabi-4.9
+          git clone --depth=1 https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_arm_arm-eabi-4.8.git arm-eabi-4.8
+          echo "$GITHUB_WORKSPACE/arm-eabi-4.8/bin" >> $GITHUB_PATH
 
-      - name: Pull kernel source
+      - name: Clone Kernel Source
         run: |
           git clone --depth=1 ${{ env.KERNEL_SOURCE }} -b ${{ env.KERNEL_SOURCE_BRANCH }} kernel-source
-          echo "KERNEL_VERSION=$(sed -n 's/.*CONFIG_LOCALVERSION=\"\([^\"]*\)\".*/\1/p' \
-            kernel-source/arch/arm/configs/${{ env.KERNEL_TARGET }}_defconfig | sed 's/^\\.//')" >> $GITHUB_ENV
 
-      - name: Clean kernel source tree
+      - name: Create Output Directory
+        run: mkdir -p out
+
+      - name: Clean Kernel Source Tree
         run: |
-          make -C kernel-source ARCH=arm distclean
+          make -C kernel-source ARCH=arm O=../out distclean
 
-      - name: Build kernel
+      - name: Build Kernel
         run: |
           export KBUILD_BUILD_USER="BUGGY"
           export KBUILD_BUILD_HOST="github"
-          export PATH="$GITHUB_WORKSPACE/arm-linux-androideabi-4.9/bin:$PATH"
+          export PATH="$GITHUB_WORKSPACE/arm-eabi-4.8/bin:$PATH"
           make -C kernel-source \
                ARCH=arm \
                O=../out \
-               ${{ env.BUILD_ARGS }} \
-               CROSS_COMPILE=arm-linux-androideabi- \
+               CROSS_COMPILE=arm-eabi- \
                ${{ env.KERNEL_TARGET }}_defconfig
-          make -C kernel-source -j$(( $(getconf _NPROCESSORS_ONLN) * 2 )) \
+          make -C kernel-source -j$(nproc) \
                ARCH=arm \
                O=../out \
-               ${{ env.BUILD_ARGS }} \
-               CROSS_COMPILE=arm-linux-androideabi-
+               CROSS_COMPILE=arm-eabi-
 
-      - name: Package kernel
+      - name: Package Kernel with AnyKernel3
         run: |
-          git clone --depth=1 ${{ env.ANYKERNEL_SOURCE }} -b ${{ env.ANYKERNEL_SOURCE_BRANCH }} AnyKernel3 && rm -rf AnyKernel3/.git AnyKernel3/.github AnyKernel3/LICENSE AnyKernel3/README.md
+          git clone --depth=1 ${{ env.ANYKERNEL_SOURCE }} -b ${{ env.ANYKERNEL_SOURCE_BRANCH }} AnyKernel3
+          rm -rf AnyKernel3/.git AnyKernel3/.github AnyKernel3/LICENSE AnyKernel3/README.md
           if [[ -f out/arch/arm/boot/zImage ]]; then
             cp out/arch/arm/boot/zImage AnyKernel3/zImage
           fi
-          if [ -f out/arch/arm/boot/dt.img ]; then
-            cp out/arch/arm/boot/dt.img AnyKernel3/dt.img
-          fi
 
-      - name: Upload kernel to artifact
+      - name: Upload Kernel Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.KERNEL_VERSION }}_${{ env.KERNEL_TARGET }}
+          name: ha3g_kernel
           path: AnyKernel3/*
