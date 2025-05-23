@@ -12,8 +12,8 @@ jobs:
 
       - name: Set Up Environment Variables
         run: |
-          echo "KERNEL_SOURCE=https://github.com/IamCodebreaker/android_kernel_samsung_exynos5420.git" >> $GITHUB_ENV
-          echo "KERNEL_SOURCE_BRANCH=lineage-17.1" >> $GITHUB_ENV
+          echo "KERNEL_SOURCE=https://github.com/exynos5420/android_kernel_samsung_exynos5420.git" >> $GITHUB_ENV
+          echo "KERNEL_SOURCE_BRANCH=lineage-18.1" >> $GITHUB_ENV
           echo "KERNEL_DEFCONFIG=lineageos_ha3g_defconfig" >> $GITHUB_ENV
           echo "ANYKERNEL_SOURCE=https://github.com/osm0sis/AnyKernel3.git" >> $GITHUB_ENV
           echo "ANYKERNEL_SOURCE_BRANCH=master" >> $GITHUB_ENV
