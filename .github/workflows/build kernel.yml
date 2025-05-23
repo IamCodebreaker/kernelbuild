@@ -1,68 +1,48 @@
-name: AENA's Kernel Build
+name: Kernel Build
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 jobs:
-  build-kernel:
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
 
-      - name: Set Up Environment Variables
+      - name: Set up Environment
         run: |
-          echo "KERNEL_SOURCE=https://github.com/exynos5420/android_kernel_samsung_exynos5420.git" >> $GITHUB_ENV
-          echo "KERNEL_SOURCE_BRANCH=lineage-18.1" >> $GITHUB_ENV
-          echo "KERNEL_DEFCONFIG=lineageos_ha3g_defconfig" >> $GITHUB_ENV
-          echo "ANYKERNEL_SOURCE=https://github.com/osm0sis/AnyKernel3.git" >> $GITHUB_ENV
-          echo "ANYKERNEL_SOURCE_BRANCH=master" >> $GITHUB_ENV
-
-      - name: Download GCC 4.8 Toolchain
-        run: |
-          # Create a directory for the toolchain
-          mkdir -p arm-eabi-4.8
-          # Download and extract the toolchain tarball directly
-          curl -L https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/arm/arm-eabi-4.8/+archive/refs/heads/android-4.8-release.tar.gz | tar -xz -C arm-eabi-4.8
+          sudo apt-get update
+          sudo apt-get install -y bc bison flex libssl-dev make libc6-dev libncurses5-dev
 
       - name: Clone Kernel Source
         run: |
-          git clone --depth=1 ${{ env.KERNEL_SOURCE }} -b ${{ env.KERNEL_SOURCE_BRANCH }} kernel-source
+          git clone --depth=1 https://github.com/exynos5420/android_kernel_samsung_exynos5420.git -b lineage-17.1 kernel-source
 
-      - name: Set Up Output Directory
-        run: mkdir -p out
+      - name: Download and Extract GCC Toolchain
+        run: |
+          wget -q https://launchpad.net/gcc-arm-embedded/4.8/4.8-2014-q3-update/+download/gcc-arm-none-eabi-4_8-2014q3-20140805-linux.tar.bz2
+          tar -xjf gcc-arm-none-eabi-4_8-2014q3-20140805-linux.tar.bz2
+          mv gcc-arm-none-eabi-4_8-2014q3 arm-eabi-4.8
+
+      - name: Set Environment Variables
+        run: |
+          echo "PATH=$GITHUB_WORKSPACE/arm-eabi-4.8/bin:$PATH" >> $GITHUB_ENV
+          echo "CROSS_COMPILE=arm-none-eabi-" >> $GITHUB_ENV
+          echo "ARCH=arm" >> $GITHUB_ENV
+
+      - name: Create Output Directory
+        run: |
+          mkdir -p out
 
       - name: Configure Kernel
         run: |
-          export PATH="$GITHUB_WORKSPACE/arm-eabi-4.8/bin:$PATH"
-          export ARCH=arm
-          export CROSS_COMPILE=arm-eabi-
-          make -C kernel-source O=../out ${{ env.KERNEL_DEFCONFIG }}
+          cd kernel-source
+          make O=../out ${{ env.DEFCONFIG }}
 
       - name: Build Kernel
         run: |
-          export PATH="$GITHUB_WORKSPACE/arm-eabi-4.8/bin:$PATH"
-          export ARCH=arm
-          export CROSS_COMPILE=arm-eabi-
-          make -C kernel-source O=../out -j$(nproc)
-
-      - name: Clone AnyKernel3
-        run: |
-          git clone --depth=1 ${{ env.ANYKERNEL_SOURCE }} -b ${{ env.ANYKERNEL_SOURCE_BRANCH }} AnyKernel3
-          # Remove unnecessary files so that only packaging files remain
-          rm -rf AnyKernel3/.git AnyKernel3/.github AnyKernel3/LICENSE AnyKernel3/README.md
-
-      - name: Package Kernel
-        run: |
-          if [ -f out/arch/arm/boot/zImage ]; then
-            cp out/arch/arm/boot/zImage AnyKernel3/zImage
-          fi
-          if [ -f out/arch/arm/boot/dt.img ]; then
-            cp out/arch/arm/boot/dt.img AnyKernel3/dt.img
-          fi
-
-      - name: Upload Kernel Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: kernel_build
-          path: AnyKernel3/*
+          cd kernel-source
+          make O=../out -j$(nproc)
