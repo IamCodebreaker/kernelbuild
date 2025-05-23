@@ -18,17 +18,19 @@ jobs:
           echo "ANYKERNEL_SOURCE=https://github.com/osm0sis/AnyKernel3.git" >> $GITHUB_ENV
           echo "ANYKERNEL_SOURCE_BRANCH=master" >> $GITHUB_ENV
 
-      - name: Clone GCC 4.8 Toolchain
+      - name: Download GCC 4.8 Toolchain
         run: |
-          git clone --depth=1 https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/arm/arm-eabi-4.8.git arm-eabi-4.8
+          # Create a directory for the toolchain
+          mkdir -p arm-eabi-4.8
+          # Download and extract the toolchain tarball directly
+          curl -L https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/arm/arm-eabi-4.8/+archive/refs/heads/android-4.8-release.tar.gz | tar -xz -C arm-eabi-4.8
 
       - name: Clone Kernel Source
         run: |
           git clone --depth=1 ${{ env.KERNEL_SOURCE }} -b ${{ env.KERNEL_SOURCE_BRANCH }} kernel-source
 
       - name: Set Up Output Directory
-        run: |
-          mkdir -p out
+        run: mkdir -p out
 
       - name: Configure Kernel
         run: |
@@ -47,6 +49,7 @@ jobs:
       - name: Clone AnyKernel3
         run: |
           git clone --depth=1 ${{ env.ANYKERNEL_SOURCE }} -b ${{ env.ANYKERNEL_SOURCE_BRANCH }} AnyKernel3
+          # Remove unnecessary files so that only packaging files remain
           rm -rf AnyKernel3/.git AnyKernel3/.github AnyKernel3/LICENSE AnyKernel3/README.md
 
       - name: Package Kernel
