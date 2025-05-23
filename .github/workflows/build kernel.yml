@@ -1,4 +1,4 @@
-name: AENA's
+name: AENA's Kernel Build
 
 on:
   workflow_dispatch:
@@ -10,55 +10,56 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v3
 
-      - name: Setup Environment Variables
+      - name: Set Up Environment Variables
         run: |
           echo "KERNEL_SOURCE=https://github.com/IamCodebreaker/android_kernel_samsung_exynos5420.git" >> $GITHUB_ENV
           echo "KERNEL_SOURCE_BRANCH=lineage-17.1" >> $GITHUB_ENV
-          echo "KERNEL_TARGET=lineageos_ha3g" >> $GITHUB_ENV
+          echo "KERNEL_DEFCONFIG=lineageos_ha3g_defconfig" >> $GITHUB_ENV
           echo "ANYKERNEL_SOURCE=https://github.com/osm0sis/AnyKernel3.git" >> $GITHUB_ENV
           echo "ANYKERNEL_SOURCE_BRANCH=master" >> $GITHUB_ENV
 
       - name: Clone GCC 4.8 Toolchain
         run: |
-          git clone --depth=1 https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_arm_arm-eabi-4.8.git arm-eabi-4.8
-          echo "$GITHUB_WORKSPACE/arm-eabi-4.8/bin" >> $GITHUB_PATH
+          git clone --depth=1 https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/arm/arm-eabi-4.8.git arm-eabi-4.8
 
       - name: Clone Kernel Source
         run: |
           git clone --depth=1 ${{ env.KERNEL_SOURCE }} -b ${{ env.KERNEL_SOURCE_BRANCH }} kernel-source
 
-      - name: Create Output Directory
-        run: mkdir -p out
-
-      - name: Clean Kernel Source Tree
+      - name: Set Up Output Directory
         run: |
-          make -C kernel-source ARCH=arm O=../out distclean
+          mkdir -p out
+
+      - name: Configure Kernel
+        run: |
+          export PATH="$GITHUB_WORKSPACE/arm-eabi-4.8/bin:$PATH"
+          export ARCH=arm
+          export CROSS_COMPILE=arm-eabi-
+          make -C kernel-source O=../out ${{ env.KERNEL_DEFCONFIG }}
 
       - name: Build Kernel
         run: |
-          export KBUILD_BUILD_USER="BUGGY"
-          export KBUILD_BUILD_HOST="github"
           export PATH="$GITHUB_WORKSPACE/arm-eabi-4.8/bin:$PATH"
-          make -C kernel-source \
-               ARCH=arm \
-               O=../out \
-               CROSS_COMPILE=arm-eabi- \
-               ${{ env.KERNEL_TARGET }}_defconfig
-          make -C kernel-source -j$(nproc) \
-               ARCH=arm \
-               O=../out \
-               CROSS_COMPILE=arm-eabi-
+          export ARCH=arm
+          export CROSS_COMPILE=arm-eabi-
+          make -C kernel-source O=../out -j$(nproc)
 
-      - name: Package Kernel with AnyKernel3
+      - name: Clone AnyKernel3
         run: |
           git clone --depth=1 ${{ env.ANYKERNEL_SOURCE }} -b ${{ env.ANYKERNEL_SOURCE_BRANCH }} AnyKernel3
           rm -rf AnyKernel3/.git AnyKernel3/.github AnyKernel3/LICENSE AnyKernel3/README.md
-          if [[ -f out/arch/arm/boot/zImage ]]; then
+
+      - name: Package Kernel
+        run: |
+          if [ -f out/arch/arm/boot/zImage ]; then
             cp out/arch/arm/boot/zImage AnyKernel3/zImage
+          fi
+          if [ -f out/arch/arm/boot/dt.img ]; then
+            cp out/arch/arm/boot/dt.img AnyKernel3/dt.img
           fi
 
       - name: Upload Kernel Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ha3g_kernel
+          name: kernel_build
           path: AnyKernel3/*
