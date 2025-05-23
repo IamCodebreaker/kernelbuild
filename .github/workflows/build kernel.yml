@@ -12,14 +12,23 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v3
 
-      - name: Set up Environment
+      - name: Set up Build Environment
         run: |
           sudo apt-get update
-          sudo apt-get install -y bc bison flex libssl-dev make libc6-dev libncurses5-dev
+          sudo apt-get install -y \
+            bc \
+            bison \
+            flex \
+            libssl-dev \
+            make \
+            libc6-dev \
+            libncurses5-dev \
+            wget \
+            tar
 
       - name: Clone Kernel Source
         run: |
-          git clone --depth=1 https://github.com/exynos5420/android_kernel_samsung_exynos5420.git -b lineage-17.1 kernel-source
+          git clone --depth=1 https://github.com/LineageOS/android_kernel_samsung_exynos5420.git -b lineage-17.1 kernel-source
 
       - name: Download and Extract GCC Toolchain
         run: |
@@ -40,7 +49,7 @@ jobs:
       - name: Configure Kernel
         run: |
           cd kernel-source
-          make O=../out ${{ env.DEFCONFIG }}
+          make O=../out rosemary_defconfig
 
       - name: Build Kernel
         run: |
